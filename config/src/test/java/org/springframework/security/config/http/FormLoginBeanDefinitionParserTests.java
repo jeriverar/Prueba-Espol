@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,143 @@ public class FormLoginBeanDefinitionParserTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/FormLoginBeanDefinitionParserTests";
 
+	public static final String EXPECTED_HTML_HEAD = """
+			<!DOCTYPE html>
+			<html lang="en">
+			  <head>
+			    <meta charset="utf-8">
+			    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+			    <meta name="description" content="">
+			    <meta name="author" content="">
+			    <title>Please sign in</title>
+			    <style>
+			    /* General layout */
+			    body {
+			      font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+			      background-color: #eee;
+			      padding: 40px 0;
+			      margin: 0;
+			      line-height: 1.5;
+			    }
+			\s\s\s\s
+			    h2 {
+			      margin-top: 0;
+			      margin-bottom: 0.5rem;
+			      font-size: 2rem;
+			      font-weight: 500;
+			      line-height: 2rem;
+			    }
+			\s\s\s\s
+			    .content {
+			      margin-right: auto;
+			      margin-left: auto;
+			      padding-right: 15px;
+			      padding-left: 15px;
+			      width: 100%;
+			      box-sizing: border-box;
+			    }
+			\s\s\s\s
+			    @media (min-width: 800px) {
+			      .content {
+			        max-width: 760px;
+			      }
+			    }
+			\s\s\s\s
+			    /* Components */
+			    a,
+			    a:visited {
+			      text-decoration: none;
+			      color: #06f;
+			    }
+			\s\s\s\s
+			    a:hover {
+			      text-decoration: underline;
+			      color: #003c97;
+			    }
+			\s\s\s\s
+			    input[type="text"],
+			    input[type="password"] {
+			      height: auto;
+			      width: 100%;
+			      font-size: 1rem;
+			      padding: 0.5rem;
+			      box-sizing: border-box;
+			    }
+			\s\s\s\s
+			    button {
+			      padding: 0.5rem 1rem;
+			      font-size: 1.25rem;
+			      line-height: 1.5;
+			      border: none;
+			      border-radius: 0.1rem;
+			      width: 100%;
+			    }
+			\s\s\s\s
+			    button.primary {
+			      color: #fff;
+			      background-color: #06f;
+			    }
+			\s\s\s\s
+			    .alert {
+			      padding: 0.75rem 1rem;
+			      margin-bottom: 1rem;
+			      line-height: 1.5;
+			      border-radius: 0.1rem;
+			      width: 100%;
+			      box-sizing: border-box;
+			      border-width: 1px;
+			      border-style: solid;
+			    }
+			\s\s\s\s
+			    .alert.alert-danger {
+			      color: #6b1922;
+			      background-color: #f7d5d7;
+			      border-color: #eab6bb;
+			    }
+			\s\s\s\s
+			    .alert.alert-success {
+			      color: #145222;
+			      background-color: #d1f0d9;
+			      border-color: #c2ebcb;
+			    }
+			\s\s\s\s
+			    .screenreader {
+			      position: absolute;
+			      clip: rect(0 0 0 0);
+			      height: 1px;
+			      width: 1px;
+			      padding: 0;
+			      border: 0;
+			      overflow: hidden;
+			    }
+			\s\s\s\s
+			    table {
+			      width: 100%;
+			      max-width: 100%;
+			      margin-bottom: 2rem;
+			    }
+			\s\s\s\s
+			    .table-striped tr:nth-of-type(2n + 1) {
+			      background-color: #e1e1e1;
+			    }
+			\s\s\s\s
+			    td {
+			      padding: 0.75rem;
+			      vertical-align: top;
+			    }
+			\s\s\s\s
+			    /* Login / logout layouts */
+			    .login-form,
+			    .logout-form {
+			      max-width: 340px;
+			      padding: 0 15px 15px 15px;
+			      margin: 0 auto 2rem auto;
+			      box-sizing: border-box;
+			    }
+			    </style>
+			  </head>
+			""";
+
 	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
@@ -53,35 +190,30 @@ public class FormLoginBeanDefinitionParserTests {
 	@Test
 	public void getLoginWhenAutoConfigThenShowsDefaultLoginPage() throws Exception {
 		this.spring.configLocations(this.xml("Simple")).autowire();
-		// @formatter:off
-		String expectedContent = "<!DOCTYPE html>\n"
-				+ "<html lang=\"en\">\n"
-				+ "  <head>\n"
-				+ "    <meta charset=\"utf-8\">\n"
-				+ "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
-				+ "    <meta name=\"description\" content=\"\">\n"
-				+ "    <meta name=\"author\" content=\"\">\n"
-				+ "    <title>Please sign in</title>\n"
-				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n"
-				+ "  </head>\n"
-				+ "  <body>\n"
-				+ "     <div class=\"container\">\n"
-				+ "      <form class=\"form-signin\" method=\"post\" action=\"/login\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Please sign in</h2>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Username</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"username\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"password\" class=\"sr-only\">Password</label>\n"
-				+ "          <input type=\"password\" id=\"password\" name=\"password\" class=\"form-control\" placeholder=\"Password\" required>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "</div>\n"
-				+ "</body></html>";
-		// @formatter:on
+		String expectedContent = EXPECTED_HTML_HEAD + """
+				  <body>
+				    <div class="content">
+				      <form class="login-form" method="post" action="/login">
+				        <h2>Please sign in</h2>
+				       \s
+				        <p>
+				          <label for="username" class="screenreader">Username</label>
+				          <input type="text" id="username" name="username" placeholder="Username" required autofocus>
+				        </p>
+				        <p>
+				          <label for="password" class="screenreader">Password</label>
+				          <input type="password" id="password" name="password" placeholder="Password" required>
+				        </p>
+
+
+				        <button type="submit" class="primary">Sign in</button>
+				      </form>
+
+
+
+				    </div>
+				  </body>
+				</html>""";
 		this.mvc.perform(get("/login")).andExpect(content().string(expectedContent));
 	}
 
@@ -94,39 +226,32 @@ public class FormLoginBeanDefinitionParserTests {
 	@Test
 	public void getLoginWhenConfiguredWithCustomAttributesThenLoginPageReflects() throws Exception {
 		this.spring.configLocations(this.xml("WithCustomAttributes")).autowire();
-		// @formatter:off
-		String expectedContent = "<!DOCTYPE html>\n"
-				+ "<html lang=\"en\">\n"
-				+ "  <head>\n"
-				+ "    <meta charset=\"utf-8\">\n"
-				+ "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
-				+ "    <meta name=\"description\" content=\"\">\n"
-				+ "    <meta name=\"author\" content=\"\">\n"
-				+ "    <title>Please sign in</title>\n"
-				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n"
-				+ "  </head>\n"
-				+ "  <body>\n"
-				+ "     <div class=\"container\">\n"
-				+ "      <form class=\"form-signin\" method=\"post\" action=\"/signin\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Please sign in</h2>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Username</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"custom_user\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"password\" class=\"sr-only\">Password</label>\n"
-				+ "          <input type=\"password\" id=\"password\" name=\"custom_pass\" class=\"form-control\" placeholder=\"Password\" required>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "</div>\n"
-				+ "</body></html>";
-		this.mvc.perform(get("/login"))
-				.andExpect(content().string(expectedContent));
-		this.mvc.perform(get("/logout"))
-				.andExpect(status().is3xxRedirection());
-		// @formatter:on
+		String expectedContent = EXPECTED_HTML_HEAD + """
+				  <body>
+				    <div class="content">
+				      <form class="login-form" method="post" action="/signin">
+				        <h2>Please sign in</h2>
+				       \s
+				        <p>
+				          <label for="username" class="screenreader">Username</label>
+				          <input type="text" id="username" name="custom_user" placeholder="Username" required autofocus>
+				        </p>
+				        <p>
+				          <label for="password" class="screenreader">Password</label>
+				          <input type="password" id="password" name="custom_pass" placeholder="Password" required>
+				        </p>
+
+
+				        <button type="submit" class="primary">Sign in</button>
+				      </form>
+
+
+
+				    </div>
+				  </body>
+				</html>""";
+		this.mvc.perform(get("/login")).andExpect(content().string(expectedContent));
+		this.mvc.perform(get("/logout")).andExpect(status().is3xxRedirection());
 	}
 
 	@Test

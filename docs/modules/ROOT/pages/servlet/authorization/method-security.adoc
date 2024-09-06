@@ -35,7 +35,7 @@ Xml::
 Then, you are immediately able to annotate any Spring-managed class or method with <<use-preauthorize, `@PreAuthorize`>>, <<use-postauthorize,`@PostAuthorize`>>, <<use-prefilter,`@PreFilter`>>, and <<use-postfilter,`@PostFilter`>> to authorize method invocations, including the input parameters and return values.
 
 [NOTE]
-{spring-boot-reference-url}using.html#using.build-systems.starters[Spring Boot Starter Security] does not activate method-level authorization by default.
+{spring-boot-reference-url}reference/using/build-systems.html#using.build-systems.starters[Spring Boot Starter Security] does not activate method-level authorization by default.
 
 Method Security supports many other use cases as well including <<use-aspectj, AspectJ support>>, <<use-programmatic-authorization,custom annotations>>, and several configuration points.
 Consider learning about the following use cases:
@@ -1012,8 +1012,8 @@ Java::
 [source,java,role="primary"]
 ----
 @Bean
-static PrePostTemplateDefaults prePostTemplateDefaults() {
-	return new PrePostTemplateDefaults();
+static AnnotationTemplateExpressionDefaults templateExpressionDefaults() {
+	return new AnnotationTemplateExpressionDefaults();
 }
 ----
 
@@ -1023,8 +1023,8 @@ Kotlin::
 ----
 companion object {
     @Bean
-    fun prePostTemplateDefaults(): PrePostTemplateDefaults {
-        return PrePostTemplateDefaults()
+    fun templateExpressionDefaults(): AnnotationTemplateExpressionDefaults {
+        return AnnotationTemplateExpressionDefaults()
     }
 }
 ----
@@ -1053,7 +1053,7 @@ Kotlin::
 @Target(ElementType.METHOD, ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @PreAuthorize("hasRole('{value}')")
-annotation class IsAdmin(val value: String)
+annotation class HasRole(val value: String)
 ----
 ======
 
@@ -2200,10 +2200,10 @@ Java::
 ----
 @RestController
 public class UserController {
-	@Autowired
+    @Autowired
     AuthorizationProxyFactory proxyFactory;
 
-	@GetMapping
+    @GetMapping
     User currentUser(@AuthenticationPrincipal User user) {
         return this.proxyFactory.proxy(user);
     }
@@ -2227,38 +2227,7 @@ class UserController  {
 ----
 ======
 
-If you are using Jackson, though, this may result in a serialization error like the following:
-
-[source,bash]
-====
-com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Direct self-reference leading to cycle
-====
-
-This is due to how Jackson works with CGLIB proxies.
-To address this, add the following annotation to the top of the `User` class:
-
-[tabs]
-======
-Java::
-+
-[source,java,role="primary"]
-----
-@JsonSerialize(as = User.class)
-public class User {
-
-}
-----
-
-Kotlin::
-+
-[source,kotlin,role="secondary"]
-----
-@JsonSerialize(`as` = User::class)
-class User
-----
-======
-
-Finally, you will need to publish a <<custom_advice, custom interceptor>> to catch the `AccessDeniedException` thrown for each field, which you can do like so:
+You will need to <<fallback-values-authorization-denied,add a `MethodAuthorizationDeniedHandler`>> like this one:
 
 [tabs]
 ======
@@ -2267,60 +2236,37 @@ Java::
 [source,java,role="primary"]
 ----
 @Component
-public class AccessDeniedExceptionInterceptor implements AuthorizationAdvisor {
-    private final AuthorizationAdvisor advisor = AuthorizationManagerBeforeMethodInterceptor.preAuthorize();
-
-	@Override
-	public Object invoke(MethodInvocation invocation) throws Throwable {
-		try {
-			return invocation.proceed();
-		} catch (AccessDeniedException ex) {
-			return null;
-		}
-	}
-
-	@Override
-	public Pointcut getPointcut() {
-		return this.advisor.getPointcut();
-	}
-
-	@Override
-	public Advice getAdvice() {
-		return this;
-	}
-
-	@Override
-	public int getOrder() {
-		return this.advisor.getOrder() - 1;
-	}
-}
-----
-
-Kotlin::
-+
-[source,kotlin,role="secondary"]
-----
-@Component
-class AccessDeniedExceptionInterceptor: AuthorizationAdvisor {
-    var advisor: AuthorizationAdvisor = AuthorizationManagerBeforeMethodInterceptor.preAuthorize()
-
-    @Throws(Throwable::class)
-    fun invoke(invocation: MethodInvocation): Any? {
-        return try  {
-            invocation.proceed()
-        } catch (ex:AccessDeniedException) {
-            null
-        }
+public class Null implements MethodAuthorizationDeniedHandler {
+    @Override
+    public Object handleDeniedInvocation(MethodInvocation methodInvocation, AuthorizationResult authorizationResult) {
+        return null;
     }
+}
 
-     val pointcut: Pointcut
-     get() = advisor.getPointcut()
+// ...
 
-     val advice: Advice
-     get() = this
+@HandleAuthorizationDenied(handlerClass = Null.class)
+public class User {
+	...
+}
+----
 
-     val order: Int
-     get() = advisor.getOrder() - 1
+Kotlin::
++
+[source,kotlin,role="secondary"]
+----
+@Component
+class Null : MethodAuthorizationDeniedHandler {
+    override fun handleDeniedInvocation(methodInvocation: MethodInvocation?, authorizationResult: AuthorizationResult?): Any? {
+        return null
+    }
+}
+
+// ...
+
+@HandleAuthorizationDenied(handlerClass = Null.class)
+open class User {
+	...
 }
 ----
 ======
@@ -2348,7 +2294,7 @@ And if they do have that authority, they'll see:
 
 [TIP]
 ====
-You can also add the Spring Boot property `spring.jackson.default-property-inclusion=non_null` to exclude the null value, if you also don't want to reveal the JSON key to an unauthorized user.
+You can also add the Spring Boot property `spring.jackson.default-property-inclusion=non_null` to exclude the null value from serialization, if you also don't want to reveal the JSON key to an unauthorized user.
 ====
 
 [[fallback-values-authorization-denied]]
