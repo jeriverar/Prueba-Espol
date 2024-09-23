@@ -51,6 +51,7 @@ import static org.mockito.Mockito.verify;
  * Tests for {@link PreFilterAuthorizationMethodInterceptor}.
  *
  * @author Evgeniy Cheban
+ * @author Gengwu Zhao
  */
 public class PreFilterAuthorizationMethodInterceptorTests {
 
@@ -182,7 +183,8 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 	public void preFilterWhenMockSecurityContextHolderStrategyThenUses() throws Throwable {
 		Authentication authentication = new TestingAuthenticationToken("john", "password",
 				AuthorityUtils.createAuthorityList("authority"));
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		List<String> list = new ArrayList<>();
 		list.add("john");
 		list.add("bob");
@@ -199,7 +201,8 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 	public void preFilterWhenStaticSecurityContextHolderStrategyAfterConstructorThenUses() throws Throwable {
 		Authentication authentication = new TestingAuthenticationToken("john", "password",
 				AuthorityUtils.createAuthorityList("authority"));
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		List<String> list = new ArrayList<>();
 		list.add("john");
 		list.add("bob");
@@ -293,6 +296,13 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 	@PreFilter("filterObject == 'john'")
 	public @interface MyPreFilter {
 
+	}
+
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
 	}
 
 }

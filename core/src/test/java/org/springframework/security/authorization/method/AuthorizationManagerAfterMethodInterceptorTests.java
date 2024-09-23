@@ -49,6 +49,7 @@ import static org.mockito.Mockito.verify;
  * Tests for {@link AuthorizationManagerAfterMethodInterceptor}.
  *
  * @author Evgeniy Cheban
+ * @author Gengwu Zhao
  */
 public class AuthorizationManagerAfterMethodInterceptorTests {
 
@@ -83,7 +84,8 @@ public class AuthorizationManagerAfterMethodInterceptorTests {
 	@Test
 	public void afterWhenMockSecurityContextHolderStrategyThenUses() throws Throwable {
 		Authentication authentication = TestAuthentication.authenticatedUser();
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		MethodInvocation invocation = mock(MethodInvocation.class);
 		AuthorizationManager<MethodInvocationResult> authorizationManager = AuthenticatedAuthorizationManager
 			.authenticated();
@@ -99,7 +101,8 @@ public class AuthorizationManagerAfterMethodInterceptorTests {
 	public void afterWhenStaticSecurityContextHolderStrategyAfterConstructorThenUses() throws Throwable {
 		Authentication authentication = new TestingAuthenticationToken("john", "password",
 				AuthorityUtils.createAuthorityList("authority"));
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		MethodInvocation invocation = mock(MethodInvocation.class);
 		AuthorizationManager<MethodInvocationResult> authorizationManager = AuthenticatedAuthorizationManager
 			.authenticated();
@@ -158,6 +161,12 @@ public class AuthorizationManagerAfterMethodInterceptorTests {
 			super(msg, authorizationResult);
 		}
 
+	}
+
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
 	}
 
 }

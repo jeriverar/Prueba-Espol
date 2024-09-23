@@ -49,6 +49,7 @@ import static org.mockito.Mockito.verify;
  * Tests for {@link PostFilterAuthorizationMethodInterceptor}.
  *
  * @author Evgeniy Cheban
+ * @author Gengwu Zhao
  */
 public class PostFilterAuthorizationMethodInterceptorTests {
 
@@ -123,7 +124,8 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 
 		Authentication authentication = new TestingAuthenticationToken("john", "password",
 				AuthorityUtils.createAuthorityList("authority"));
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		String[] array = { "john", "bob" };
 		MockMethodInvocation invocation = new MockMethodInvocation(new TestClass(), TestClass.class,
 				"doSomethingArrayAuthentication", new Class[] { String[].class }, new Object[] { array }) {
@@ -144,7 +146,8 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 
 		Authentication authentication = new TestingAuthenticationToken("john", "password",
 				AuthorityUtils.createAuthorityList("authority"));
-		SecurityContextHolderStrategy strategy = MockSecurityContextHolderStrategy.getmock(new SecurityContextImpl(authentication));
+		SecurityContextHolderStrategy strategy = mockSecurityContextHolderStrategy(
+				new SecurityContextImpl(authentication));
 		String[] array = { "john", "bob" };
 		MockMethodInvocation invocation = new MockMethodInvocation(new TestClass(), TestClass.class,
 				"doSomethingArrayAuthentication", new Class[] { String[].class }, new Object[] { array }) {
@@ -226,6 +229,13 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 	@PostFilter("filterObject == 'john'")
 	public @interface MyPostFilter {
 
+	}
+
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
 	}
 
 }
