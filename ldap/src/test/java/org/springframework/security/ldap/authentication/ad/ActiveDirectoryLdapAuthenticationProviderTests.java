@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ import static org.mockito.Mockito.verify;
 /**
  * @author Luke Taylor
  * @author Rob Winch
+ * @author Gengwu Zhao
  */
 public class ActiveDirectoryLdapAuthenticationProviderTests {
 
@@ -69,11 +70,14 @@ public class ActiveDirectoryLdapAuthenticationProviderTests {
 	ActiveDirectoryLdapAuthenticationProvider provider;
 
 	UsernamePasswordAuthenticationToken joe = UsernamePasswordAuthenticationToken.unauthenticated("joe", "password");
+
 	DirContext ctx;
+
 	@BeforeEach
-	public void setUp() {
+	public void setUp() throws NamingException {
 		this.provider = new ActiveDirectoryLdapAuthenticationProvider("mydomain.eu", "ldap://192.168.1.200/");
 		ctx = mock(DirContext.class);
+		given(ctx.getNameInNamespace()).willReturn("");
 	}
 
 	@Test
@@ -196,6 +200,7 @@ public class ActiveDirectoryLdapAuthenticationProviderTests {
 		assertThatExceptionOfType(IncorrectResultSizeDataAccessException.class)
 			.isThrownBy(() -> this.provider.authenticate(this.joe));
 	}
+
 	static final String msg = "[LDAP: error code 49 - 80858585: LdapErr: DSID-DECAFF0, comment: AcceptSecurityContext error, data ";
 
 	@Test
