@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
  * @author Ben Alex
  * @author Luke Taylor
  * @author Onur Kagan Ozcan
+ * @author Gengwu Zhao
  */
 public class ConcurrentSessionFilterTests {
 
@@ -209,7 +210,8 @@ public class ConcurrentSessionFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		RedirectStrategy redirect = mock(RedirectStrategy.class);
 		final String expiredUrl = "/expired";
-		ConcurrentSessionFilter filter = new ConcurrentSessionFilter(mockSessionRegistry(), expiredUrl + "will-be-overrridden") {
+		ConcurrentSessionFilter filter = new ConcurrentSessionFilter(mockSessionRegistry(),
+				expiredUrl + "will-be-overrridden") {
 			@Override
 			protected String determineExpiredUrl(HttpServletRequest request, SessionInformation info) {
 				return expiredUrl;
@@ -270,7 +272,8 @@ public class ConcurrentSessionFilterTests {
 		ConcurrentSessionFilter filter = new ConcurrentSessionFilter(new SessionRegistryImpl());
 		assertThatIllegalArgumentException().isThrownBy(() -> filter.setLogoutHandlers(new LogoutHandler[0]));
 	}
-	private SessionRegistry mockSessionRegistry(){
+
+	private SessionRegistry mockSessionRegistry() {
 		SessionRegistry registry = mock(SessionRegistry.class);
 		SessionInformation information = new SessionInformation("user", "sessionId",
 				new Date(System.currentTimeMillis() - 1000));
@@ -278,4 +281,5 @@ public class ConcurrentSessionFilterTests {
 		given(registry.getSessionInformation(anyString())).willReturn(information);
 		return registry;
 	}
+
 }
