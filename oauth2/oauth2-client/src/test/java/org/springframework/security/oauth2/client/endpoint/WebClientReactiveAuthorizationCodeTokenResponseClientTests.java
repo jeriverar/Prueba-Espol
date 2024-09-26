@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -429,6 +430,30 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		OAuth2AuthorizationCodeGrantRequest request = authorizationCodeGrantRequest();
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\",\n"
+				+ "   \"scope\": \"openid profile\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersConverter(null))
 			.withMessage("parametersConverter cannot be null");
@@ -441,7 +466,7 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterAddedThenCalled() throws Exception {
 		OAuth2AuthorizationCodeGrantRequest request = authorizationCodeGrantRequest();
 		Converter<OAuth2AuthorizationCodeGrantRequest, MultiValueMap<String, String>> addedParametersConverter = mock(
 				Converter.class);
@@ -466,7 +491,7 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		OAuth2AuthorizationCodeGrantRequest request = authorizationCodeGrantRequest();
 		Converter<OAuth2AuthorizationCodeGrantRequest, MultiValueMap<String, String>> parametersConverter = mock(
 				Converter.class);
@@ -506,11 +531,35 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClientTests {
 		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
 		parameters.set(OAuth2ParameterNames.CODE, "custom-code");
 		parameters.set(OAuth2ParameterNames.REDIRECT_URI, "custom-uri");
-		// The client_id parameter is omitted for testing purposes
 		this.tokenResponseClient.setParametersConverter((grantRequest) -> parameters);
 		this.tokenResponseClient.getTokenResponse(request).block();
 		String body = this.server.takeRequest().getBody().readUtf8();
-		assertThat(body).contains("grant_type=custom", "code=custom-code", "redirect_uri=custom-uri");
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "code=custom-code",
+				"redirect_uri=custom-uri");
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		OAuth2AuthorizationCodeGrantRequest request = authorizationCodeGrantRequest();
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+				+ "  \"token_type\":\"bearer\",\n"
+				+ "  \"expires_in\":3600,\n"
+				+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+				+ "}";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	// gh-10260

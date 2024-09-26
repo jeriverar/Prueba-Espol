@@ -19,6 +19,7 @@ package org.springframework.security.oauth2.client.endpoint;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -412,6 +413,31 @@ public class WebClientReactivePasswordTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		OAuth2PasswordGrantRequest request = new OAuth2PasswordGrantRequest(this.clientRegistrationBuilder.build(),
+				this.username, this.password);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+			+ "   \"access_token\": \"access-token-1234\",\n"
+			+ "   \"token_type\": \"bearer\",\n"
+			+ "   \"expires_in\": \"3600\",\n"
+			+ "   \"scope\": \"openid profile\"\n"
+			+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersConverter(null))
 			.withMessage("parametersConverter cannot be null");
@@ -424,7 +450,7 @@ public class WebClientReactivePasswordTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterAddedThenCalled() throws Exception {
 		OAuth2PasswordGrantRequest request = new OAuth2PasswordGrantRequest(this.clientRegistrationBuilder.build(),
 				this.username, this.password);
 		Converter<OAuth2PasswordGrantRequest, MultiValueMap<String, String>> addedParametersConverter = mock(
@@ -450,7 +476,7 @@ public class WebClientReactivePasswordTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		OAuth2PasswordGrantRequest request = new OAuth2PasswordGrantRequest(this.clientRegistrationBuilder.build(),
 				this.username, this.password);
 		Converter<OAuth2PasswordGrantRequest, MultiValueMap<String, String>> parametersConverter = mock(
@@ -484,7 +510,6 @@ public class WebClientReactivePasswordTokenResponseClientTests {
 		parameters.set(OAuth2ParameterNames.USERNAME, "user");
 		parameters.set(OAuth2ParameterNames.PASSWORD, "password");
 		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
-		// The client_id parameter is omitted for testing purposes
 		this.tokenResponseClient.setParametersConverter((grantRequest) -> parameters);
 		// @formatter:off
 		String accessTokenSuccessResponse = "{\n"
@@ -497,7 +522,32 @@ public class WebClientReactivePasswordTokenResponseClientTests {
 		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
 		this.tokenResponseClient.getTokenResponse(request).block();
 		String body = this.server.takeRequest().getBody().readUtf8();
-		assertThat(body).contains("grant_type=custom", "scope=one+two", "username=user", "password=password");
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "scope=one+two", "username=user", "password=password");
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		OAuth2PasswordGrantRequest request = new OAuth2PasswordGrantRequest(this.clientRegistrationBuilder.build(),
+				this.username, this.password);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+			+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+			+ "  \"token_type\":\"bearer\",\n"
+			+ "  \"expires_in\":3600,\n"
+			+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+			+ "}";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	// gh-10260

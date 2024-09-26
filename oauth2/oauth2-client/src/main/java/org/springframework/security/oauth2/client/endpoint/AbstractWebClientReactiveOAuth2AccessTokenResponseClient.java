@@ -16,6 +16,8 @@
 
 package org.springframework.security.oauth2.client.endpoint;
 
+import java.util.function.Consumer;
+
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.convert.converter.Converter;
@@ -24,6 +26,7 @@ import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.web.reactive.function.OAuth2BodyExtractors;
 import org.springframework.util.Assert;
 import org.springframework.util.LinkedMultiValueMap;
@@ -66,9 +69,13 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 
 	private Converter<T, HttpHeaders> headersConverter = new DefaultOAuth2TokenRequestHeadersConverter<>();
 
-	private final Converter<T, MultiValueMap<String, String>> defaultParametersConverter = new DefaultOAuth2TokenRequestParametersConverter<>();
+	private Consumer<HttpHeaders> headersCustomizer = (headers) -> {
+	};
 
 	private Converter<T, MultiValueMap<String, String>> parametersConverter = this::createParameters;
+
+	private Consumer<MultiValueMap<String, String>> parametersCustomizer = (parameters) -> {
+	};
 
 	private BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor = OAuth2BodyExtractors
 		.oauth2AccessTokenResponse();
@@ -107,6 +114,10 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 
 	private RequestHeadersSpec<?> populateRequest(T grantRequest) {
 		MultiValueMap<String, String> parameters = this.parametersConverter.convert(grantRequest);
+		if (parameters == null) {
+			parameters = new LinkedMultiValueMap<>();
+		}
+		this.parametersCustomizer.accept(parameters);
 		return this.webClient.post()
 			.uri(grantRequest.getClientRegistration().getProviderDetails().getTokenUri())
 			.headers((headers) -> {
@@ -114,6 +125,7 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 				if (headersToAdd != null) {
 					headers.addAll(headersToAdd);
 				}
+				this.headersCustomizer.accept(headers);
 			})
 			.body(BodyInserters.fromFormData(parameters));
 	}
@@ -126,7 +138,17 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	 * Token Request body
 	 */
 	MultiValueMap<String, String> createParameters(T grantRequest) {
-		return this.defaultParametersConverter.convert(grantRequest);
+		ClientRegistration clientRegistration = grantRequest.getClientRegistration();
+		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
+		parameters.set(OAuth2ParameterNames.GRANT_TYPE, grantRequest.getGrantType().getValue());
+		if (!ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+			.equals(clientRegistration.getClientAuthenticationMethod())) {
+			parameters.set(OAuth2ParameterNames.CLIENT_ID, clientRegistration.getClientId());
+		}
+		if (ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(clientRegistration.getClientAuthenticationMethod())) {
+			parameters.set(OAuth2ParameterNames.CLIENT_SECRET, clientRegistration.getClientSecret());
+		}
+		return parameters;
 	}
 
 	/**
@@ -183,47 +205,38 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	}
 
 	/**
+	 * Sets the {@link Consumer} used for customizing all of the OAuth 2.0 Access Token
+	 * headers, which allows for headers to be added, overwritten or removed.
+	 * @param headersCustomizer the {@link Consumer} to customize the headers
+	 * @since 6.4
+	 */
+	public final void setHeadersCustomizer(Consumer<HttpHeaders> headersCustomizer) {
+		Assert.notNull(headersCustomizer, "headersCustomizer cannot be null");
+		this.headersCustomizer = headersCustomizer;
+	}
+
+	/**
 	 * Sets the {@link Converter} used for converting the
 	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link MultiValueMap}
 	 * used in the OAuth 2.0 Access Token Request body.
-	 * <p>
-	 * For backwards compatibility with Spring Security 6.3 (and earlier), this method
-	 * ensures that default parameters for this particular grant type are provided if the
-	 * given parameters converter does not supply them. In order to fully override or omit
-	 * parameters, supply this method with an instance of
-	 * {@link DefaultOAuth2TokenRequestParametersConverter} via
-	 * {@link DefaultOAuth2TokenRequestParametersConverter#of(Converter)} and only the
-	 * returned parameters will be provided.
 	 * @param parametersConverter the {@link Converter} used for converting the
 	 * {@link AbstractOAuth2AuthorizationGrantRequest} to {@link MultiValueMap}
 	 * @since 5.6
-	 * @see DefaultOAuth2TokenRequestParametersConverter#of(Converter)
 	 */
 	public final void setParametersConverter(Converter<T, MultiValueMap<String, String>> parametersConverter) {
 		Assert.notNull(parametersConverter, "parametersConverter cannot be null");
-		// Allow opting into new behavior of fully overriding parameter values when
-		// user provides instance of DefaultOAuth2TokenRequestParametersConverter.
-		if (parametersConverter instanceof DefaultOAuth2TokenRequestParametersConverter) {
-			this.parametersConverter = parametersConverter;
-		}
-		else {
-			// For backwards compatibility with 6.3, ensure default parameters are always
-			// populated but allow parameter values to be overridden if provided.
-			// TODO: Remove in Spring Security 7
-			Converter<T, MultiValueMap<String, String>> defaultParametersConverter = this::createParameters;
-			this.parametersConverter = (authorizationGrantRequest) -> {
-				MultiValueMap<String, String> parameters = defaultParametersConverter
-					.convert(authorizationGrantRequest);
-				if (parameters == null) {
-					parameters = new LinkedMultiValueMap<>();
-				}
-				MultiValueMap<String, String> parametersToSet = parametersConverter.convert(authorizationGrantRequest);
-				if (parametersToSet != null) {
-					parameters.putAll(parametersToSet);
-				}
-				return parameters;
-			};
-		}
+		Converter<T, MultiValueMap<String, String>> defaultParametersConverter = this::createParameters;
+		this.parametersConverter = (authorizationGrantRequest) -> {
+			MultiValueMap<String, String> parameters = defaultParametersConverter.convert(authorizationGrantRequest);
+			if (parameters == null) {
+				parameters = new LinkedMultiValueMap<>();
+			}
+			MultiValueMap<String, String> parametersToSet = parametersConverter.convert(authorizationGrantRequest);
+			if (parametersToSet != null) {
+				parameters.putAll(parametersToSet);
+			}
+			return parameters;
+		};
 		this.requestEntityConverter = this::populateRequest;
 	}
 
@@ -252,6 +265,17 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 			return parameters;
 		};
 		this.requestEntityConverter = this::populateRequest;
+	}
+
+	/**
+	 * Sets the {@link Consumer} used for customizing all of the OAuth 2.0 Access Token
+	 * parameters, which allows for parameters to be added, overwritten or removed.
+	 * @param parametersCustomizer the {@link Consumer} to customize the parameters
+	 * @since 6.4
+	 */
+	public final void setParametersCustomizer(Consumer<MultiValueMap<String, String>> parametersCustomizer) {
+		Assert.notNull(parametersCustomizer, "parametersCustomizer cannot be null");
+		this.parametersCustomizer = parametersCustomizer;
 	}
 
 	/**

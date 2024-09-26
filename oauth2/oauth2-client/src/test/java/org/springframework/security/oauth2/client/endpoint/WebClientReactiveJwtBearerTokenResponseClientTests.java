@@ -17,6 +17,7 @@
 package org.springframework.security.oauth2.client.endpoint;
 
 import java.util.Collections;
+import java.util.function.Consumer;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -232,6 +233,30 @@ public class WebClientReactiveJwtBearerTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		JwtBearerGrantRequest request = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.client.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		enqueueJson("{\n"
+			+ "   \"access_token\": \"access-token-1234\",\n"
+			+ "   \"token_type\": \"bearer\",\n"
+			+ "   \"expires_in\": \"3600\",\n"
+			+ "   \"scope\": \"openid profile\"\n"
+			+ "}\n");
+		// @formatter:on
+		this.client.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setParametersConverter(null))
 			.withMessage("parametersConverter cannot be null");
@@ -244,7 +269,7 @@ public class WebClientReactiveJwtBearerTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterAddedThenCalled() throws Exception {
 		ClientRegistration clientRegistration = this.clientRegistration.build();
 		JwtBearerGrantRequest request = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
 		Converter<JwtBearerGrantRequest, MultiValueMap<String, String>> addedParametersConverter = mock(
@@ -263,7 +288,7 @@ public class WebClientReactiveJwtBearerTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		ClientRegistration clientRegistration = this.clientRegistration.build();
 		JwtBearerGrantRequest request = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
 		Converter<JwtBearerGrantRequest, MultiValueMap<String, String>> parametersConverter = mock(Converter.class);
@@ -287,12 +312,35 @@ public class WebClientReactiveJwtBearerTokenResponseClientTests {
 		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
 		parameters.set(OAuth2ParameterNames.ASSERTION, "custom-assertion");
 		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
-		// The client_id parameter is omitted for testing purposes
 		this.client.setParametersConverter((grantRequest) -> parameters);
 		enqueueJson(DEFAULT_ACCESS_TOKEN_RESPONSE);
 		this.client.getTokenResponse(request).block();
 		String body = this.server.takeRequest().getBody().readUtf8();
-		assertThat(body).contains("grant_type=custom", "scope=one+two", "assertion=custom-assertion");
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "scope=one+two", "assertion=custom-assertion");
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		JwtBearerGrantRequest request = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.client.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		enqueueJson("{\n"
+			+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+			+ "  \"token_type\":\"bearer\",\n"
+			+ "  \"expires_in\":3600,\n"
+			+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+			+ "}");
+		// @formatter:on
+		this.client.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	@Test

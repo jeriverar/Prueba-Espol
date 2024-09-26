@@ -20,6 +20,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -369,6 +370,30 @@ public class WebClientReactiveClientCredentialsTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void convertWhenHeadersCustomizerSetThenCalled() throws Exception {
+		OAuth2ClientCredentialsGrantRequest request = new OAuth2ClientCredentialsGrantRequest(
+				this.clientRegistration.build());
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.client.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		enqueueJson("{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\",\n"
+				+ "   \"scope\": \"openid profile\"\n"
+				+ "}\n");
+		// @formatter:on
+		this.client.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setParametersConverter(null))
 			.withMessage("parametersConverter cannot be null");
@@ -381,7 +406,7 @@ public class WebClientReactiveClientCredentialsTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterAddedThenCalled() throws Exception {
 		OAuth2ClientCredentialsGrantRequest request = new OAuth2ClientCredentialsGrantRequest(
 				this.clientRegistration.build());
 		Converter<OAuth2ClientCredentialsGrantRequest, MultiValueMap<String, String>> addedParametersConverter = mock(
@@ -406,7 +431,7 @@ public class WebClientReactiveClientCredentialsTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		OAuth2ClientCredentialsGrantRequest request = new OAuth2ClientCredentialsGrantRequest(
 				this.clientRegistration.build());
 		Converter<OAuth2ClientCredentialsGrantRequest, MultiValueMap<String, String>> parametersConverter = mock(
@@ -437,7 +462,6 @@ public class WebClientReactiveClientCredentialsTokenResponseClientTests {
 		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
 		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
 		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
-		// The client_id parameter is omitted for testing purposes
 		this.client.setParametersConverter((grantRequest) -> parameters);
 		// @formatter:off
 		String accessTokenSuccessResponse = "{\n"
@@ -449,7 +473,31 @@ public class WebClientReactiveClientCredentialsTokenResponseClientTests {
 		enqueueJson(accessTokenSuccessResponse);
 		this.client.getTokenResponse(request).block();
 		String body = this.server.takeRequest().getBody().readUtf8();
-		assertThat(body).contains("grant_type=custom", "scope=one+two");
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "scope=one+two");
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.client.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		OAuth2ClientCredentialsGrantRequest request = new OAuth2ClientCredentialsGrantRequest(
+				this.clientRegistration.build());
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.client.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		enqueueJson("{\n"
+			+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+			+ "  \"token_type\":\"bearer\",\n"
+			+ "  \"expires_in\":3600,\n"
+			+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+			+ "}");
+		// @formatter:on
+		this.client.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	// gh-10260
