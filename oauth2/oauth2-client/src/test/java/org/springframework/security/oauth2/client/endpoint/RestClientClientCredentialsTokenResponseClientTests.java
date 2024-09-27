@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -53,6 +54,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -120,6 +122,15 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		// @formatter:off
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+				.withMessage("headersCustomizer cannot be null");
+		// @formatter:on
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		// @formatter:off
 		assertThatIllegalArgumentException()
@@ -134,6 +145,15 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> this.tokenResponseClient.addParametersConverter(null))
 				.withMessage("parametersConverter cannot be null");
+		// @formatter:on
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		// @formatter:off
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+				.withMessage("parametersCustomizer cannot be null");
 		// @formatter:on
 	}
 
@@ -429,6 +449,24 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 	}
 
 	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		OAuth2ClientCredentialsGrantRequest grantRequest = new OAuth2ClientCredentialsGrantRequest(clientRegistration);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		this.tokenResponseClient.getTokenResponse(grantRequest);
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		// @formatter:off
 		String accessTokenSuccessResponse = "{\n"
@@ -471,7 +509,6 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
 		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
 		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
-		// The client_id parameter is omitted for testing purposes
 		given(parametersConverter.convert(grantRequest)).willReturn(parameters);
 		this.tokenResponseClient.setParametersConverter((authorizationGrantRequest) -> parameters);
 		this.tokenResponseClient.getTokenResponse(grantRequest);
@@ -480,9 +517,10 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 		// @formatter:off
 		assertThat(formParameters).contains(
 				param(OAuth2ParameterNames.GRANT_TYPE, "custom"),
-				param(OAuth2ParameterNames.SCOPE, "one two"));
+				param(OAuth2ParameterNames.CLIENT_ID, "client-1"),
+				param(OAuth2ParameterNames.SCOPE, "one two")
+		);
 		// @formatter:on
-		assertThat(formParameters).doesNotContain(OAuth2ParameterNames.CLIENT_ID);
 	}
 
 	@Test
@@ -515,6 +553,24 @@ public class RestClientClientCredentialsTokenResponseClientTests {
 				param("custom-parameter-name", "custom-parameter-value")
 		);
 		// @formatter:on
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		OAuth2ClientCredentialsGrantRequest grantRequest = new OAuth2ClientCredentialsGrantRequest(clientRegistration);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		this.tokenResponseClient.getTokenResponse(grantRequest);
+		verify(parametersCustomizer).accept(any());
 	}
 
 	@Test
