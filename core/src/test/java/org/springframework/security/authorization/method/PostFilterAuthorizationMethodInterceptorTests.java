@@ -164,6 +164,13 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 		SecurityContextHolder.setContextHolderStrategy(saved);
 	}
 
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
+	}
+
 	@PostFilter("filterObject == 'john'")
 	public static class TestClass implements InterfaceAnnotationsOne, InterfaceAnnotationsTwo {
 
@@ -229,13 +236,6 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 	@PostFilter("filterObject == 'john'")
 	public @interface MyPostFilter {
 
-	}
-
-	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
-
-		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
-		given(strategy.getContext()).willReturn(securityContextImpl);
-		return strategy;
 	}
 
 }

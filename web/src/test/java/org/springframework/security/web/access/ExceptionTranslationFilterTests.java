@@ -295,8 +295,7 @@ public class ExceptionTranslationFilterTests {
 
 	private FilterChain mockFilterChainWithException(Exception exception) throws ServletException, IOException {
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(exception).given(fc)
-			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
+		willThrow(exception).given(fc).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		return fc;
 	}
 

@@ -216,6 +216,13 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 		SecurityContextHolder.setContextHolderStrategy(saved);
 	}
 
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
+	}
+
 	@PreFilter("filterObject == 'john'")
 	public static class TestClass implements InterfaceAnnotationsOne, InterfaceAnnotationsTwo {
 
@@ -296,13 +303,6 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 	@PreFilter("filterObject == 'john'")
 	public @interface MyPreFilter {
 
-	}
-
-	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
-
-		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
-		given(strategy.getContext()).willReturn(securityContextImpl);
-		return strategy;
 	}
 
 }

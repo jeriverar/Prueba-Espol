@@ -148,19 +148,19 @@ public class AuthorizationManagerBeforeMethodInterceptorTests {
 		assertThatExceptionOfType(MyAuthzDeniedException.class).isThrownBy(() -> advice.invoke(null));
 	}
 
+	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
+
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(securityContextImpl);
+		return strategy;
+	}
+
 	static class MyAuthzDeniedException extends AuthorizationDeniedException {
 
 		MyAuthzDeniedException(String msg, AuthorizationResult authorizationResult) {
 			super(msg, authorizationResult);
 		}
 
-	}
-
-	private SecurityContextHolderStrategy mockSecurityContextHolderStrategy(SecurityContextImpl securityContextImpl) {
-
-		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
-		given(strategy.getContext()).willReturn(securityContextImpl);
-		return strategy;
 	}
 
 }
