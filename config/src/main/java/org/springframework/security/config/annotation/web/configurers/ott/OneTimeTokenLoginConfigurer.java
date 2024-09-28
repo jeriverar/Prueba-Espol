@@ -20,10 +20,7 @@ import java.util.Collections;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -48,6 +45,7 @@ import org.springframework.security.web.authentication.ott.GeneratedOneTimeToken
 import org.springframework.security.web.authentication.ott.OneTimeTokenAuthenticationConverter;
 import org.springframework.security.web.authentication.ui.DefaultLoginPageGeneratingFilter;
 import org.springframework.security.web.authentication.ui.DefaultOneTimeTokenSubmitPageGeneratingFilter;
+import org.springframework.security.web.authentication.ui.DefaultResourcesFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -58,8 +56,6 @@ import static org.springframework.security.web.util.matcher.AntPathRequestMatche
 
 public final class OneTimeTokenLoginConfigurer<H extends HttpSecurityBuilder<H>>
 		extends AbstractHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H> {
-
-	private final Log logger = LogFactory.getLog(getClass());
 
 	private final ApplicationContext context;
 
@@ -136,10 +132,11 @@ public final class OneTimeTokenLoginConfigurer<H extends HttpSecurityBuilder<H>>
 	}
 
 	private void configureOttGenerateFilter(H http) {
-		GenerateOneTimeTokenFilter generateFilter = new GenerateOneTimeTokenFilter(getOneTimeTokenService(http));
-		generateFilter.setGeneratedOneTimeTokenHandler(getGeneratedOneTimeTokenHandler(http));
+		GenerateOneTimeTokenFilter generateFilter = new GenerateOneTimeTokenFilter(getOneTimeTokenService(http),
+				getGeneratedOneTimeTokenHandler(http));
 		generateFilter.setRequestMatcher(antMatcher(HttpMethod.POST, this.generateTokenUrl));
 		http.addFilter(postProcess(generateFilter));
+		http.addFilter(DefaultResourcesFilter.css());
 	}
 
 	private GeneratedOneTimeTokenHandler getGeneratedOneTimeTokenHandler(H http) {
@@ -323,12 +320,8 @@ public final class OneTimeTokenLoginConfigurer<H extends HttpSecurityBuilder<H>>
 		if (context == null) {
 			return null;
 		}
-		try {
-			return context.getBean(clazz);
-		}
-		catch (NoSuchBeanDefinitionException ex) {
-			return null;
-		}
+
+		return context.getBeanProvider(clazz).getIfUnique();
 	}
 
 	private Map<String, String> hiddenInputs(HttpServletRequest request) {

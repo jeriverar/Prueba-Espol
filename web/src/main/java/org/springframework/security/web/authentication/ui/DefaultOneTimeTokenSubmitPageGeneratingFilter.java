@@ -28,7 +28,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.springframework.security.web.util.CssUtils;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
@@ -64,6 +63,8 @@ public final class DefaultOneTimeTokenSubmitPageGeneratingFilter extends OncePer
 	}
 
 	private String generateHtml(HttpServletRequest request) {
+		String contextPath = request.getContextPath();
+
 		String token = request.getParameter("token");
 		String tokenValue = StringUtils.hasText(token) ? token : "";
 
@@ -74,9 +75,9 @@ public final class DefaultOneTimeTokenSubmitPageGeneratingFilter extends OncePer
 			.collect(Collectors.joining("\n"));
 
 		return HtmlTemplates.fromTemplate(ONE_TIME_TOKEN_SUBMIT_PAGE_TEMPLATE)
-			.withRawHtml("cssStyle", CssUtils.getCssStyleBlock().indent(4))
+			.withValue("contextPath", contextPath)
 			.withValue("tokenValue", tokenValue)
-			.withValue("loginProcessingUrl", this.loginProcessingUrl)
+			.withValue("loginProcessingUrl", contextPath + this.loginProcessingUrl)
 			.withRawHtml("hiddenInputs", hiddenInputs)
 			.render();
 	}
@@ -115,15 +116,9 @@ public final class DefaultOneTimeTokenSubmitPageGeneratingFilter extends OncePer
 			    <title>One-Time Token Login</title>
 			    <meta charset="utf-8"/>
 			    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
-			    <meta http-equiv="Content-Security-Policy" content="script-src 'sha256-oZhLbc2kO8b8oaYLrUc7uye1MgVKMyLtPqWR4WtKF+c='"/>
-			{{cssStyle}}
+			    <link href="{{contextPath}}/default-ui.css" rel="stylesheet" />
 			  </head>
 			  <body>
-			    <noscript>
-			      <p>
-			        <strong>Note:</strong> Since your browser does not support JavaScript, you must press the Sign In button once to proceed.
-			      </p>
-			    </noscript>
 			    <div class="container">
 			      <form class="login-form" action="{{loginProcessingUrl}}" method="post">
 			        <h2>Please input the token</h2>

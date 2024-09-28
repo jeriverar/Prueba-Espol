@@ -21,6 +21,7 @@ import java.io.IOException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -41,13 +42,19 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.ott.GeneratedOneTimeTokenHandler;
 import org.springframework.security.web.authentication.ott.RedirectGeneratedOneTimeTokenHandler;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatException;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -111,6 +118,71 @@ public class OneTimeTokenLoginConfigurerTests {
 	}
 
 	@Test
+	void oneTimeTokenWhenConfiguredThenServesCss() throws Exception {
+		this.spring.register(OneTimeTokenDefaultConfig.class).autowire();
+		this.mvc.perform(get("/default-ui.css"))
+			.andExpect(status().isOk())
+			.andExpect(content().string(Matchers.containsString("body {")));
+	}
+
+	@Test
+	void oneTimeTokenWhenFormLoginConfiguredThenRendersRequestTokenForm() throws Exception {
+		this.spring.register(OneTimeTokenFormLoginConfig.class).autowire();
+		CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "BaseSpringSpec_CSRFTOKEN");
+		String csrfAttributeName = HttpSessionCsrfTokenRepository.class.getName().concat(".CSRF_TOKEN");
+		//@formatter:off
+		this.mvc.perform(get("/login").sessionAttr(csrfAttributeName, csrfToken))
+				.andExpect((result) -> {
+					CsrfToken token = (CsrfToken) result.getRequest().getAttribute(CsrfToken.class.getName());
+					assertThat(result.getResponse().getContentAsString()).isEqualTo(
+						"""
+						<!DOCTYPE html>
+						<html lang="en">
+						  <head>
+						    <meta charset="utf-8">
+						    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+						    <meta name="description" content="">
+						    <meta name="author" content="">
+						    <title>Please sign in</title>
+						    <link href="/default-ui.css" rel="stylesheet" />
+						  </head>
+						  <body>
+						    <div class="content">
+						      <form class="login-form" method="post" action="/login">
+						        <h2>Please sign in</h2>
+
+						        <p>
+						          <label for="username" class="screenreader">Username</label>
+						          <input type="text" id="username" name="username" placeholder="Username" required autofocus>
+						        </p>
+						        <p>
+						          <label for="password" class="screenreader">Password</label>
+						          <input type="password" id="password" name="password" placeholder="Password" required>
+						        </p>
+
+						<input name="_csrf" type="hidden" value="%s" />
+						        <button type="submit" class="primary">Sign in</button>
+						      </form>
+						      <form id="ott-form" class="login-form" method="post" action="/ott/generate">
+						        <h2>Request a One-Time Token</h2>
+
+						        <p>
+						          <label for="ott-username" class="screenreader">Username</label>
+						          <input type="text" id="ott-username" name="username" placeholder="Username" required>
+						        </p>
+						<input name="_csrf" type="hidden" value="%s" />
+						        <button class="primary" type="submit" form="ott-form">Send Token</button>
+						      </form>
+
+
+						    </div>
+						  </body>
+						</html>""".formatted(token.getToken(), token.getToken()));
+				});
+		//@formatter:on
+	}
+
+	@Test
 	void oneTimeTokenWhenNoGeneratedOneTimeTokenHandlerThenException() {
 		assertThatException()
 			.isThrownBy(() -> this.spring.register(OneTimeTokenNoGeneratedOttHandlerConfig.class).autowire())
@@ -160,6 +232,28 @@ public class OneTimeTokenLoginConfigurerTests {
 							.generatedOneTimeTokenHandler(new TestGeneratedOneTimeTokenHandler("/redirected"))
 							.loginProcessingUrl("/loginprocessingurl")
 							.authenticationSuccessHandler(new SimpleUrlAuthenticationSuccessHandler("/authenticated"))
+					);
+			// @formatter:on
+			return http.build();
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	@EnableWebSecurity
+	@Import(UserDetailsServiceConfig.class)
+	static class OneTimeTokenFormLoginConfig {
+
+		@Bean
+		SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+			// @formatter:off
+			http
+					.authorizeHttpRequests((authz) -> authz
+							.anyRequest().authenticated()
+					)
+					.formLogin(Customizer.withDefaults())
+					.oneTimeTokenLogin((ott) -> ott
+							.generatedOneTimeTokenHandler(new TestGeneratedOneTimeTokenHandler())
 					);
 			// @formatter:on
 			return http.build();

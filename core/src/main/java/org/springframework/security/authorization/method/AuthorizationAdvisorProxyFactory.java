@@ -17,6 +17,7 @@
 package org.springframework.security.authorization.method;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,10 +38,13 @@ import java.util.TreeSet;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import org.aopalliance.aop.Advice;
+import org.aopalliance.intercept.MethodInvocation;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.aop.Advisor;
+import org.springframework.aop.Pointcut;
 import org.springframework.aop.framework.AopInfrastructureBean;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -86,6 +90,8 @@ public final class AuthorizationAdvisorProxyFactory
 
 	private static final TargetVisitor DEFAULT_VISITOR_SKIP_VALUE_TYPES = TargetVisitor.of(new ClassVisitor(),
 			new IgnoreValueTypeVisitor(), DEFAULT_VISITOR);
+
+	private final AuthorizationProxyMethodInterceptor authorizationProxy = new AuthorizationProxyMethodInterceptor();
 
 	private List<AuthorizationAdvisor> advisors;
 
@@ -163,14 +169,19 @@ public final class AuthorizationAdvisorProxyFactory
 		if (target == null) {
 			return null;
 		}
+		if (target instanceof AuthorizationProxy proxied) {
+			return proxied;
+		}
 		Object proxied = this.visitor.visit(this, target);
 		if (proxied != null) {
 			return proxied;
 		}
 		ProxyFactory factory = new ProxyFactory(target);
+		factory.addAdvisors(this.authorizationProxy);
 		for (Advisor advisor : this.advisors) {
 			factory.addAdvisors(advisor);
 		}
+		factory.addInterface(AuthorizationProxy.class);
 		factory.setOpaque(true);
 		factory.setProxyTargetClass(!Modifier.isFinal(target.getClass().getModifiers()));
 		return factory.getProxy();
@@ -352,17 +363,24 @@ public final class AuthorizationAdvisorProxyFactory
 
 	private static final class ClassVisitor implements TargetVisitor {
 
+		private final AuthorizationProxyMethodInterceptor authorizationProxy = new AuthorizationProxyMethodInterceptor();
+
 		@Override
 		public Object visit(AuthorizationAdvisorProxyFactory proxyFactory, Object object) {
 			if (object instanceof Class<?> targetClass) {
+				if (AuthorizationProxy.class.isAssignableFrom(targetClass)) {
+					return targetClass;
+				}
 				ProxyFactory factory = new ProxyFactory();
 				factory.setTargetClass(targetClass);
 				factory.setInterfaces(ClassUtils.getAllInterfacesForClass(targetClass));
 				factory.setOpaque(true);
 				factory.setProxyTargetClass(!Modifier.isFinal(targetClass.getModifiers()));
+				factory.addAdvisor(this.authorizationProxy);
 				for (Advisor advisor : proxyFactory) {
 					factory.addAdvisors(advisor);
 				}
+				factory.addInterface(AuthorizationProxy.class);
 				return factory.getProxyClass(getClass().getClassLoader());
 			}
 			return null;
@@ -568,6 +586,36 @@ public final class AuthorizationAdvisorProxyFactory
 
 		private Flux<?> proxyFlux(AuthorizationProxyFactory proxyFactory, Flux<?> flux) {
 			return flux.map(proxyFactory::proxy);
+		}
+
+	}
+
+	private static final class AuthorizationProxyMethodInterceptor implements AuthorizationAdvisor {
+
+		private static final Method GET_TARGET_METHOD = ClassUtils.getMethod(AuthorizationProxy.class,
+				"toAuthorizedTarget");
+
+		@Override
+		public Object invoke(MethodInvocation invocation) throws Throwable {
+			if (invocation.getMethod().equals(GET_TARGET_METHOD)) {
+				return invocation.getThis();
+			}
+			return invocation.proceed();
+		}
+
+		@Override
+		public Pointcut getPointcut() {
+			return Pointcut.TRUE;
+		}
+
+		@Override
+		public Advice getAdvice() {
+			return this;
+		}
+
+		@Override
+		public int getOrder() {
+			return 0;
 		}
 
 	}
