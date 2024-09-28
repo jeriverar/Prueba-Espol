@@ -293,9 +293,9 @@ public class ExceptionTranslationFilterTests {
 		verify(source).getMessage(eq(code), any(), any());
 	}
 
-	private FilterChain mockFilterChainWithException(Object exception) throws ServletException, IOException {
+	private FilterChain mockFilterChainWithException(Exception exception) throws ServletException, IOException {
 		FilterChain fc = mock(FilterChain.class);
-		willThrow((Throwable) exception).given(fc)
+		willThrow(exception).given(fc)
 			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		return fc;
 	}
