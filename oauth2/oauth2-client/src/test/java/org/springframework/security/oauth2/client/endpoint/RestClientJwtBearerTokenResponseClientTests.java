@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -53,6 +54,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -122,6 +124,15 @@ public class RestClientJwtBearerTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		// @formatter:off
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+				.withMessage("headersCustomizer cannot be null");
+		// @formatter:on
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		// @formatter:off
 		assertThatIllegalArgumentException()
@@ -136,6 +147,15 @@ public class RestClientJwtBearerTokenResponseClientTests {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> this.tokenResponseClient.addParametersConverter(null))
 				.withMessage("parametersConverter cannot be null");
+		// @formatter:on
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		// @formatter:off
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+				.withMessage("parametersCustomizer cannot be null");
 		// @formatter:on
 	}
 
@@ -395,6 +415,24 @@ public class RestClientJwtBearerTokenResponseClientTests {
 	}
 
 	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		JwtBearerGrantRequest grantRequest = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		this.tokenResponseClient.getTokenResponse(grantRequest);
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		this.clientRegistration.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
 		// @formatter:off
@@ -419,10 +457,11 @@ public class RestClientJwtBearerTokenResponseClientTests {
 		// @formatter:off
 		assertThat(formParameters).contains(
 				param(OAuth2ParameterNames.GRANT_TYPE, "custom"),
-				param(OAuth2ParameterNames.ASSERTION, "custom-assertion"),
-				param(OAuth2ParameterNames.SCOPE, "one two"));
+				param(OAuth2ParameterNames.CLIENT_ID, "client-1"),
+				param(OAuth2ParameterNames.SCOPE, "one two"),
+				param(OAuth2ParameterNames.ASSERTION, "custom-assertion")
+		);
 		// @formatter:on
-		assertThat(formParameters).doesNotContain(OAuth2ParameterNames.CLIENT_ID);
 	}
 
 	@Test
@@ -480,6 +519,24 @@ public class RestClientJwtBearerTokenResponseClientTests {
 				param("custom-parameter-name", "custom-parameter-value")
 		);
 		// @formatter:on
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		ClientRegistration clientRegistration = this.clientRegistration.build();
+		JwtBearerGrantRequest grantRequest = new JwtBearerGrantRequest(clientRegistration, this.jwtAssertion);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		this.tokenResponseClient.getTokenResponse(grantRequest);
+		verify(parametersCustomizer).accept(any());
 	}
 
 	@Test

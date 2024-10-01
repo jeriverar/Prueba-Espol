@@ -21,6 +21,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.function.Consumer;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -544,6 +545,31 @@ public class WebClientReactiveTokenExchangeTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		TokenExchangeGrantRequest request = new TokenExchangeGrantRequest(this.clientRegistration.build(),
+				this.subjectToken, this.actorToken);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+			+ "   \"access_token\": \"access-token-1234\",\n"
+			+ "   \"token_type\": \"bearer\",\n"
+			+ "   \"expires_in\": \"3600\",\n"
+			+ "   \"scope\": \"openid profile\"\n"
+			+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		// @formatter:off
 		String accessTokenSuccessResponse = "{\n"
@@ -565,6 +591,29 @@ public class WebClientReactiveTokenExchangeTokenResponseClientTests {
 		RecordedRequest recordedRequest = this.server.takeRequest();
 		String formParameters = recordedRequest.getBody().readUtf8();
 		assertThat(formParameters).contains("custom-parameter-name=custom-parameter-value");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersConverterSetThenAbleToOverrideDefaultParameters() throws Exception {
+		this.clientRegistration.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
+		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
+		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
+		parameters.set(OAuth2ParameterNames.SUBJECT_TOKEN, "custom-token");
+		this.tokenResponseClient.setParametersConverter((request) -> parameters);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "   \"access_token\": \"access-token-1234\",\n"
+				+ "   \"token_type\": \"bearer\",\n"
+				+ "   \"expires_in\": \"3600\"\n"
+				+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		TokenExchangeGrantRequest grantRequest = new TokenExchangeGrantRequest(this.clientRegistration.build(),
+				this.subjectToken, this.actorToken);
+		this.tokenResponseClient.getTokenResponse(grantRequest).block();
+		String body = this.server.takeRequest().getBody().readUtf8();
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "scope=one+two", "subject_token=custom-token");
 	}
 
 	@Test
@@ -598,6 +647,31 @@ public class WebClientReactiveTokenExchangeTokenResponseClientTests {
 				param("custom-parameter-name", "custom-parameter-value")
 		);
 		// @formatter:on
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		TokenExchangeGrantRequest request = new TokenExchangeGrantRequest(this.clientRegistration.build(),
+				this.subjectToken, this.actorToken);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+				+ "  \"token_type\":\"bearer\",\n"
+				+ "  \"expires_in\":3600,\n"
+				+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+				+ "}";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	@Test

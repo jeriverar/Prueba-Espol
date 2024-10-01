@@ -19,6 +19,7 @@ package org.springframework.security.oauth2.client.endpoint;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -46,6 +47,7 @@ import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.TestOAuth2AccessTokens;
 import org.springframework.security.oauth2.core.TestOAuth2RefreshTokens;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.endpoint.TestOAuth2AccessTokenResponses;
 import org.springframework.security.oauth2.jose.TestJwks;
 import org.springframework.security.oauth2.jose.TestKeys;
@@ -327,7 +329,7 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 
 	// gh-10130
 	@Test
-	public void convertWhenHeadersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenHeadersConverterAddedThenCalled() throws Exception {
 		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
 				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
 		Converter<OAuth2RefreshTokenGrantRequest, HttpHeaders> addedHeadersConverter = mock(Converter.class);
@@ -354,7 +356,7 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 
 	// gh-10130
 	@Test
-	public void convertWhenHeadersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenHeadersConverterSetThenCalled() throws Exception {
 		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
 				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
 		ClientRegistration clientRegistration = request.getClientRegistration();
@@ -380,6 +382,31 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 	}
 
 	@Test
+	public void setHeadersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setHeadersCustomizer(null))
+			.withMessage("headersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenHeadersCustomizerSetThenCalled() throws Exception {
+		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
+				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
+		Consumer<HttpHeaders> headersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setHeadersCustomizer(headersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+			+ "   \"access_token\": \"access-token-1234\",\n"
+			+ "   \"token_type\": \"bearer\",\n"
+			+ "   \"expires_in\": \"3600\",\n"
+			+ "   \"scope\": \"openid profile\"\n"
+			+ "}\n";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(headersCustomizer).accept(any(HttpHeaders.class));
+	}
+
+	@Test
 	public void setParametersConverterWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersConverter(null))
 			.withMessage("parametersConverter cannot be null");
@@ -392,7 +419,7 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterAddedThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterAddedThenCalled() throws Exception {
 		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
 				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
 		Converter<OAuth2RefreshTokenGrantRequest, MultiValueMap<String, String>> addedParametersConverter = mock(
@@ -418,7 +445,7 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 	}
 
 	@Test
-	public void convertWhenParametersConverterSetThenCalled() throws Exception {
+	public void getTokenResponseWhenParametersConverterSetThenCalled() throws Exception {
 		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
 				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
 		Converter<OAuth2RefreshTokenGrantRequest, MultiValueMap<String, String>> parametersConverter = mock(
@@ -440,6 +467,55 @@ public class WebClientReactiveRefreshTokenTokenResponseClientTests {
 		verify(parametersConverter).convert(request);
 		RecordedRequest actualRequest = this.server.takeRequest();
 		assertThat(actualRequest.getBody().readUtf8()).contains("custom-parameter-name=custom-parameter-value");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersConverterSetThenAbleToOverrideDefaultParameters() throws Exception {
+		this.clientRegistrationBuilder.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
+				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
+		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
+		parameters.set(OAuth2ParameterNames.GRANT_TYPE, "custom");
+		parameters.set(OAuth2ParameterNames.REFRESH_TOKEN, "custom-token");
+		parameters.set(OAuth2ParameterNames.SCOPE, "one two");
+		this.tokenResponseClient.setParametersConverter((grantRequest) -> parameters);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+				+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+				+ "  \"token_type\":\"bearer\",\n"
+				+ "  \"expires_in\":3600,\n"
+				+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+				+ "}";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		String body = this.server.takeRequest().getBody().readUtf8();
+		assertThat(body).contains("grant_type=custom", "client_id=client-id", "refresh_token=custom-token", "scope=one+two");
+	}
+
+	@Test
+	public void setParametersCustomizerWhenNullThenThrowIllegalArgumentException() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.tokenResponseClient.setParametersCustomizer(null))
+			.withMessage("parametersCustomizer cannot be null");
+	}
+
+	@Test
+	public void getTokenResponseWhenParametersCustomizerSetThenCalled() throws Exception {
+		OAuth2RefreshTokenGrantRequest request = new OAuth2RefreshTokenGrantRequest(
+				this.clientRegistrationBuilder.build(), this.accessToken, this.refreshToken);
+		Consumer<MultiValueMap<String, String>> parametersCustomizer = mock(Consumer.class);
+		this.tokenResponseClient.setParametersCustomizer(parametersCustomizer);
+		// @formatter:off
+		String accessTokenSuccessResponse = "{\n"
+			+ "  \"access_token\":\"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3\",\n"
+			+ "  \"token_type\":\"bearer\",\n"
+			+ "  \"expires_in\":3600,\n"
+			+ "  \"refresh_token\":\"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk\"\n"
+			+ "}";
+		// @formatter:on
+		this.server.enqueue(jsonResponse(accessTokenSuccessResponse));
+		this.tokenResponseClient.getTokenResponse(request).block();
+		verify(parametersCustomizer).accept(any());
 	}
 
 	// gh-10260
